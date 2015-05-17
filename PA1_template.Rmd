@@ -8,18 +8,225 @@ output:
 
 ## Loading and preprocessing the data
 
+Set the working directory
+```{r set the working directory}
+setwd("C:/Users/Mike/Rspace/JHU_RR/RepData_PeerAssessment1")
+```
+
+Unzip the data file if this has not yet been done
+```{r unzip the data if this has not yet been done}
+
+if(!file.exists("activity.csv")){
+        unzip("activity.zip")
+        }
+```
+Load the data into a data frame df. Convert dates to Date format and include a column df.tdec that contains the decimal time of each interval.
+```{r load into df}
+library(lubridate)
+df<-read.csv("activity.csv",stringsAsFactors=FALSE)
+df$date<-as.Date(df$date)
+time<-as.character(formatC(df$interval, width = 4, format = "d", flag = "0"))
+h<-substr(time,start=1,stop=2)
+m<-substr(time,start=3,stop=4)
+time<-paste(h,":",m,sep="")
+
+t.lub<-hm(time)
+tdec <- hour(t.lub) + minute(t.lub)/60
+
+
+df<-data.frame(df,tdec,stringsAsFactors=FALSE)
+#df$time<-as.POSIXct(df$time,format="%H%M")
+```
+### First inspection of the data
+Structure
+```{r structure}
+str(df)
+```
+and Summary:
+
+```{r summary}
+summary(df, na.rm=TRUE)
+```
+
 
 
 ## What is mean total number of steps taken per day?
+First find the number of steps taken each day
+```{r daily means}
+dailysum<-aggregate(steps~date,df,sum,na.rm=TRUE)
+
+```
+Plot a histogram of the counts for total steps per day, showing the mean value as a red dashed line.
+```{r histogram}
+library(ggplot2)
+	
+
+a<-ggplot(dailysum, aes(x=steps)) +
+    geom_histogram(binwidth=1000, colour="black", fill="white") +
+    geom_vline(aes(xintercept=mean(steps, na.rm=T)),   # Ignore NA values for mean
+               color="red", linetype="dashed", size=1)
+a<-a+xlab("steps per day")
+a
+```
+  
+Find the mean number of steps taken per day
+```{r mean}
+meansteps<-mean(dailysum$steps)
+```
+The mean number is `r as.integer(meansteps)`
 
 
+and the median number of steps per day
+```{r median}
+mediansteps<-median(dailysum$steps)
+```
+The median number is `r as.integer(mediansteps)`
 
 ## What is the average daily activity pattern?
 
+Construct the data frame "dap" which contains, for each interval of the day the average number of steps in that interval, across all days in the data set. The decimal time of eacvh interval is included in another column.
+```{r activity pattern}
+dap<-sapply(split(df$steps, df$interval), mean,na.rm=TRUE)
+str(dap)
+ddf<-as.data.frame(dap)
+ints<-unique(df$tdec)
+dap<-cbind(ints,ddf)
+colnames(dap)<-c("time","steps")
+str(dap)
+head(dap)
+```
+Plot against interval number the average across all days in the data set of the number of steps taken in each interval. 
 
+```{r plot daily activity pattern}
+b<-ggplot(dap, aes(x=ints,y=steps)) +
+    geom_line(colour="blue")
+b<-b+xlab("Time (hours)")+ylab("Average number of steps per 5 minute interval")
+b<-b+scale_x_continuous(limits=c(0,24),breaks = seq(0, 24, 2))
+b
+```
+
+Which interval has the maximum number of steps?
+
+
+```{r find interval with most steps per day and present as HH:MM}
+mint<-dap$time[which.max(dap$steps)]
+mint<-paste(floor(mint),":",60*(mint-floor(mint)),sep="")
+
+```
+It is the interval which starts at `r mint`
 
 ## Imputing missing values
 
+First we find how many missing values there are.
 
+```{r How many missing values?}
+nmissing<-sum(is.na(df$steps))
+```
+There are `r nmissing` missing values in the data set.
+
+Our strategy for imputing missing values will be to set the number of steps in each 5 minute interval where the value is missing to be equal to the average for that interval of non-missing values over the whole data set.
+
+We now create a new data set that is equal to the original data set but with the missing values filled in.
+
+```{r,warning=FALSE,message=FALSE}
+library(dplyr)
+df<-group_by(df,interval)
+df3<-summarise(df,avg=mean(steps,na.rm=TRUE))
+df<-ungroup(df)
+
+nr3<-nrow(df3)
+avgcol<-c(rep(0,ncol(df)))
+indcol<-c(rep(0,ncol(df)))
+df.imp<-data.frame(df,avgcol,indcol)
+
+df.imp$indcol[is.na(df.imp$steps)]<-1
+df.imp$avgcol<-df.imp$avgcol+df3$avg
+
+df.imp$steps[is.na(df.imp$steps)]<-0
+df.imp$steps<-df.imp$avgcol*df.imp$indcol+df.imp$steps
+df.imp<-select(df.imp,-(avgcol:indcol))
+```
+```{r}
+dailysum.imp<-aggregate(steps~date,df.imp,sum,na.rm=TRUE)
+```
+
+Plot a histogram of the counts for total steps per day, NA values having been imputed with avarege value for that time period. The mean value is shown as a red dashed line.
+```{r histogram imp}
+library(ggplot2)       
+c<-ggplot(dailysum.imp, aes(x=steps)) +
+    geom_histogram(binwidth=1000, colour="black", fill="white") +
+    geom_vline(aes(xintercept=mean(steps, na.rm=T)),   # Ignore NA values for mean
+               color="red", linetype="dashed", size=1)
+c<-c+xlab("steps per day")
+c
+```
+
+Find the mean number of steps taken per day
+```{r mean imp}
+meansteps.imp<-mean(dailysum.imp$steps)
+```
+The mean number after imputation is `r as.integer(meansteps.imp)`
+
+and the median number of steps per day after imputation:
+```{r median imp}
+mediansteps.imp<-median(dailysum.imp$steps)
+```
+The median number of steps per day, after imputation  is `r as.integer(mediansteps.imp)`
+
+It makes little difference whether imputed values are included or not.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+
+df.imp$day<-weekdays(df.imp$date)
+daytype<-c(rep("weekday",nrow(df.imp)))
+
+for(i in 1:nrow(df.imp)){
+        if(df.imp$day[i]=="Saturday" | df.imp$day[i]=="Sunday"){
+                daytype[i]<-"weekend"
+        }
+}
+
+df.imp<-data.frame(df.imp,daytype)
+
+summary(df.imp)
+head(df.imp)
+str(df.imp)
+```
+Ahem
+```{r fkkkkkiiiiitttt}
+df.group<-df.imp %>% group_by(daytype) %>% summarise(avg=mean(steps))
+str(df.group)
+```
+```{r try dplyr}
+xxx<-df.imp %>% group_by(interval,daytype) %>% summarise(mean(steps))
+head(xxx)
+str(xxx)
+```
+
+```{r}
+dap.imp<-df.imp %>% group_by(interval,daytype) %>% summarise(mean(steps))
+str(dap.imp)
+head(dap.imp)
+ddf.imp<-as.data.frame(dap.imp)
+ints<-unique(df.imp$tdec)
+dap.imp<-cbind(ints,ddf.imp)
+colnames(dap.imp)<-c("time","steps","daytype","avg")
+dap.imp$ints<-dap.imp$steps*1
+str(dap.imp)
+head(dap.imp)
+```
+```{r plot with daytype (we or wd) as factor}
+plot(dap.imp$time,dap.imp$avg,type="l")
+c<-ggplot(dap.imp, aes(x=time,y=avg))
+c<-c+geom_line(colour="blue")
+c<-c+facet_wrap(~daytype)
+
+c<-c+scale_x_continuous(limits=c(0,24),breaks = seq(0, 24, 2))
+c<-c+xlab("Time (hours)")+ylab("Average number of steps per 5 minute interval")
+c
+```
+
+
+
