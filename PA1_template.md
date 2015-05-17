@@ -411,12 +411,6 @@ head(dap.imp)
 ```
 
 ```r
-plot(dap.imp$time,dap.imp$avg,type="l")
-```
-
-![](PA1_template_files/figure-html/plot with daytype (we or wd) as factor-1.png) 
-
-```r
 c<-ggplot(dap.imp, aes(x=time,y=avg))
 c<-c+geom_line(colour="blue")
 c<-c+facet_wrap(~daytype)
@@ -426,7 +420,7 @@ c<-c+xlab("Time (hours)")+ylab("Average number of steps per 5 minute interval")
 c
 ```
 
-![](PA1_template_files/figure-html/plot with daytype (we or wd) as factor-2.png) 
+![](PA1_template_files/figure-html/plot with daytype (we or wd) as factor-1.png) 
 
 
 

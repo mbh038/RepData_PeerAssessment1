@@ -218,7 +218,7 @@ str(dap.imp)
 head(dap.imp)
 ```
 ```{r plot with daytype (we or wd) as factor}
-plot(dap.imp$time,dap.imp$avg,type="l")
+
 c<-ggplot(dap.imp, aes(x=time,y=avg))
 c<-c+geom_line(colour="blue")
 c<-c+facet_wrap(~daytype)
